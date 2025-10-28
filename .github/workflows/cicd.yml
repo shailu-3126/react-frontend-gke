@@ -1,4 +1,4 @@
-name: React Frontend CI/CD to GKE
+name: React App CI/CD to GKE
 
 on:
   push:
@@ -6,10 +6,10 @@ on:
       - main
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  GKE_CLUSTER: ${{ secrets.GKE_CLUSTER_NAME }}
-  GKE_ZONE: ${{ secrets.GCP_ZONE }}
-  IMAGE: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/react-repo/frontend
+  PROJECT_ID: test-kumar-makala
+  GKE_CLUSTER: react-cluster
+  GKE_ZONE: us-central1-c
+  IMAGE: us-central1-docker.pkg.dev/test-kumar-makala/react-repo/frontend
 
 jobs:
   build-and-deploy:
@@ -17,56 +17,45 @@ jobs:
 
     steps:
       # Step 1: Checkout code
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Setup Node.js
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      # Step 3: Install dependencies
-      - name: Install dependencies
-        run: npm install
-
-      # Step 4: Build React app
-      - name: Build React app
-        run: npm run build
-
-      # Step 5: Authenticate with Google Cloud
+      # Step 2: Authenticate to Google Cloud
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
 
-      # Step 6: Configure gcloud
-      - name: Set up gcloud CLI
+      # Step 3: Set up gcloud CLI
+      - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
 
-      # Step 7: Configure Docker to use GCP Artifact Registry
-      - name: Configure Docker auth
+      # Step 4: Configure Docker for Artifact Registry
+      - name: Configure Docker authentication
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
-      # Step 8: Build Docker image
+      # Step 5: Install dependencies and build React app
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build React app
+        run: npm run build
+
+      # Step 6: Build and push Docker image to Artifact Registry
       - name: Build Docker image
-        run: |
-          docker build -t $IMAGE:$GITHUB_SHA .
+        run: docker build -t $IMAGE:$GITHUB_SHA .
 
-      # Step 9: Push Docker image to Artifact Registry
       - name: Push Docker image
-        run: |
-          docker push $IMAGE:$GITHUB_SHA
+        run: docker push $IMAGE:$GITHUB_SHA
 
-      # Step 10: Connect to GKE
+      # Step 7: Get GKE credentials
       - name: Get GKE credentials
-        run: |
-          gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $PROJECT_ID
+        run: gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $PROJECT_ID
 
-      # Step 11: Deploy to GKE
+      # Step 8: Deploy to GKE
       - name: Deploy to GKE
         run: |
-          kubectl set image deployment/frontend-deployment frontend-container=$IMAGE:$GITHUB_SHA
-          kubectl rollout status deployment/frontend-deployment
+          kubectl set image deployment/react-frontend-deployment react-frontend=$IMAGE:$GITHUB_SHA
+          kubectl rollout status deployment/react-frontend-deployment
